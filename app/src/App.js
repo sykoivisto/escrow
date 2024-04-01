@@ -2,6 +2,25 @@ import { ethers } from 'ethers';
 import { useEffect, useState } from 'react';
 import deploy from './deploy';
 import Escrow from './Escrow';
+import { initializeApp } from 'firebase/app';
+import { getDatabase, ref, set, get, child } from "firebase/database";
+
+const firebaseConfig = {
+  databaseURL: "https://escrow-application-8dec3-default-rtdb.firebaseio.com",
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getDatabase(firebaseApp);
+
+function writeEscrow(address, arbiter, beneficiary, value) {
+  set(ref(db, 'escrows/' + address + Date.now()), {
+    address: address,
+    arbiter: arbiter,
+    beneficiary : beneficiary,
+    value : value,
+    completed : true,
+  });
+}
 
 const provider = new ethers.providers.Web3Provider(window.ethereum);
 
@@ -11,8 +30,8 @@ export async function approve(escrowContract, signer) {
 }
 
 function App() {
-  // TODO here usestate of escrows get request from server
   const [escrows, setEscrows] = useState([]);
+  const [prev, setPrev] = useState([]);
   const [account, setAccount] = useState();
   const [signer, setSigner] = useState();
 
@@ -25,6 +44,24 @@ function App() {
     }
 
     getAccounts();
+
+
+    const dbRef = ref(getDatabase());
+    let loadedEscrows = [];
+    get(child(dbRef, `escrows`)).then((snapshot) => {
+      if (snapshot.exists()) {
+        for (let escrow in snapshot.val()) {
+          loadedEscrows.push(snapshot.val()[escrow])
+        }
+    setPrev([...prev, ...loadedEscrows])
+
+      } else {
+        console.log("No data available");
+      }
+    }).catch((error) => {
+      console.error(error);
+    });
+
   }, [account]);
 
   async function newContract() {
@@ -42,6 +79,7 @@ function App() {
       value: value.toString(),
       handleApprove: async () => {
         escrowContract.on('Approved', () => {
+          writeEscrow(escrow.address, escrow.arbiter, escrow.beneficiary, escrow.value);
           document.getElementById(escrowContract.address).className =
             'complete';
           document.getElementById(escrowContract.address).innerText =
@@ -49,10 +87,10 @@ function App() {
         });
 
         await approve(escrowContract, signer);
+
       },
     };
 
-    // TODO here push escrow to server
     setEscrows([...escrows, escrow]);
   }
 
@@ -62,17 +100,17 @@ function App() {
         <h1> New Contract </h1>
         <label>
           Arbiter Address
-          <input type="text" id="arbiter" />
+          <input type="text" id="arbiter" value={'0x70997970C51812dc3A010C7d01b50e0d17dc79C8'}/>
         </label>
 
         <label>
           Beneficiary Address
-          <input type="text" id="beneficiary" />
+          <input type="text" id="beneficiary" value={'0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC'}/>
         </label>
 
         <label>
           Deposit Amount (in ETH)
-          <input type="text" id="eth" />
+          <input type="text" id="eth" value={'1'}/>
         </label>
 
         <div
@@ -89,10 +127,19 @@ function App() {
       </div>
 
       <div className="existing-contracts">
-        <h1> Existing Contracts </h1>
+        <h1> Current Contracts </h1>
 
         <div id="container">
           {escrows.map((escrow) => {
+            return <Escrow key={escrow.address} {...escrow} />;
+          })}
+        </div>
+      </div>
+      <div className="existing-contracts">
+        <h1> Previous Contracts </h1>
+
+        <div id="container">
+          {prev.map((escrow) => {
             return <Escrow key={escrow.address} {...escrow} />;
           })}
         </div>
