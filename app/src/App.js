@@ -11,6 +11,7 @@ export async function approve(escrowContract, signer) {
 }
 
 function App() {
+  // TODO here usestate of escrows get request from server
   const [escrows, setEscrows] = useState([]);
   const [account, setAccount] = useState();
   const [signer, setSigner] = useState();
@@ -29,9 +30,10 @@ function App() {
   async function newContract() {
     const beneficiary = document.getElementById('beneficiary').value;
     const arbiter = document.getElementById('arbiter').value;
-    const value = ethers.BigNumber.from(document.getElementById('wei').value);
+    const valueETH = document.getElementById('eth').value;
+    const valueWEI = String(valueETH * 1000000000000000000);
+    const value = ethers.BigNumber.from(valueWEI);
     const escrowContract = await deploy(signer, arbiter, beneficiary, value);
-
 
     const escrow = {
       address: escrowContract.address,
@@ -50,6 +52,7 @@ function App() {
       },
     };
 
+    // TODO here push escrow to server
     setEscrows([...escrows, escrow]);
   }
 
@@ -68,8 +71,8 @@ function App() {
         </label>
 
         <label>
-          Deposit Amount (in Wei)
-          <input type="text" id="wei" />
+          Deposit Amount (in ETH)
+          <input type="text" id="eth" />
         </label>
 
         <div
